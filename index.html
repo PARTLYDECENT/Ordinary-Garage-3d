@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Babylon.js Vehicle Displayer</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Babylon.js Core and Loader scripts -->
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <style>
+        /* Custom font and ensuring canvas takes full space */
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevents scrollbars */
+        }
+        #renderCanvas {
+            width: 100%;
+            height: 100%;
+            touch-action: none; /* Prevents browser gestures on canvas */
+        }
+        /* Style for the loading/error overlay */
+        #info-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            padding: 1rem 2rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 0.5rem;
+            text-align: center;
+            z-index: 10;
+            display: none; /* Hidden by default */
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-900 text-white">
+
+    <!-- The canvas where the 3D scene will be rendered -->
+    <canvas id="renderCanvas"></canvas>
+
+    <!-- UI Controls for switching vehicles -->
+    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-gray-800 bg-opacity-80 p-3 rounded-xl shadow-lg">
+        <!-- Previous Button -->
+        <button id="prevBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        
+        <!-- Vehicle Name Display -->
+        <div class="text-center">
+            <h2 id="vehicleName" class="text-xl font-bold w-48">Vehicle 1</h2>
+        </div>
+
+        <!-- Next Button -->
+        <button id="nextBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+        </button>
+    </div>
+
+    <!-- Overlay for loading and error messages -->
+    <div id="info-overlay">
+        <p id="info-text"></p>
+    </div>
+
+    <script>
+        // SKYBOX FUNCTION - Wild Grid Shader
+        function createSkybox(scene) {
+            const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+
+            const shaderMaterial = new BABYLON.ShaderMaterial("skyShader", scene, {
+                vertexSource: `
+                    precision highp float;
+
+                    // Attributes
+                    attribute vec3 position;
+
+                    // Uniforms
+                    uniform mat4 worldViewProjection;
+
+                    // Varying
+                    varying vec3 vPosition;
+
+                    void main(void) {
+                        vPosition = position;
+                        gl_Position = worldViewProjection * vec4(position, 1.0);
+                    }
+                `,
+                fragmentSource: `
+                    precision highp float;
+
+                    varying vec3 vPosition;
+                    uniform float time;
+
+                    // Rotation matrix
+                    mat2 rot(float a) {
+                        float c = cos(a);
+                        float s = sin(a);
+                        return mat2(c, -s, s, c);
+                    }
+
+                    // Hash function for randomness
+                    float hash(vec2 p) {
+                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+                    }
+
+                    // Noise function
+                    float noise(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        f = f * f * (3.0 - 2.0 * f);
+                        
+                        float a = hash(i);
+                        float b = hash(i + vec2(1.0, 0.0));
+                        float c = hash(i + vec2(0.0, 1.0));
+                        float d = hash(i + vec2(1.0, 1.0));
+                        
+                        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                    }
+
+                    // Fractal noise
+                    float fbm(vec2 p) {
+                        float value = 0.0;
+                        float amplitude = 0.5;
+                        for(int i = 0; i < 6; i++) {
+                            value += amplitude * noise(p);
+                            p *= 2.0;
+                            amplitude *= 0.5;
+                        }
+                        return value;
+                    }
+
+                    // Grid function with morphing
+                    float grid(vec2 p, float scale, float morph) {
+                        p *= scale;
+                        
+                        // Add some warping
+                        p += vec2(sin(p.y * 0.5 + time * 2.0), cos(p.x * 0.3 + time * 1.5)) * morph;
+                        
+                        vec2 grid_p = abs(fract(p) - 0.5);
+                        float line_width = 0.02 + 0.03 * sin(time * 3.0 + length(p) * 0.1);
+                        
+                        return smoothstep(line_width, line_width * 0.5, min(grid_p.x, grid_p.y));
+                    }
+
+                    // Tunnel effect
+                    vec3 tunnel(vec3 dir) {
+                        float t = time * 0.5;
+                        vec2 uv = dir.xy / (dir.z + 0.5);
+                        
+                        // Rotate the tunnel
+                        uv *= rot(t * 0.2);
+                        
+                        // Multiple grid layers with different scales and colors
+                        float grid1 = grid(uv, 8.0 + sin(t) * 4.0, 0.3);
+                        float grid2 = grid(uv, 16.0 + cos(t * 1.3) * 8.0, 0.2);
+                        float grid3 = grid(uv, 32.0 + sin(t * 0.7) * 16.0, 0.1);
+                        
+                        // Color the grids
+                        vec3 col1 = vec3(1.0, 0.2, 0.8) * grid1; // Hot pink
+                        vec3 col2 = vec3(0.2, 1.0, 0.8) * grid2; // Cyan
+                        vec3 col3 = vec3(0.8, 0.8, 0.2) * grid3; // Yellow
+                        
+                        // Combine with additive blending
+                        vec3 color = col1 + col2 + col3;
+                        
+                        // Add some glow based on distance
+                        float dist = length(uv) * 0.1;
+                        color *= (1.0 + sin(dist - t * 2.0) * 0.5);
+                        
+                        // Fade with depth
+                        float depth_fade = 1.0 / (1.0 + dir.z * dir.z * 0.1);
+                        color *= depth_fade;
+                        
+                        return color;
+                    }
+
+                    // Plasma background
+                    vec3 plasma(vec2 p) {
+                        float t = time * 0.3;
+                        float x = p.x;
+                        float y = p.y;
+                        
+                        float v = sin((x * 10.0 + t));
+                        v += sin((y * 10.0 + t) / 2.0);
+                        v += sin((x * 10.0 + y * 10.0 + t) / 2.0);
+                        
+                        float cx = x + 0.5 * sin(t / 5.0);
+                        float cy = y + 0.5 * cos(t / 3.0);
+                        v += sin(sqrt(100.0 * (cx * cx + cy * cy) + 1.0) + t);
+                        
+                        v = v / 4.0;
+                        
+                        return vec3(
+                            sin(v * 3.14159),
+                            sin(v * 3.14159 + 2.0 * 3.14159 / 3.0),
+                            sin(v * 3.14159 + 4.0 * 3.14159 / 3.0)
+                        ) * 0.3;
+                    }
+
+                    void main() {
+                        vec2 uv = vPosition.xy;
+                        vec3 dir = normalize(vec3(uv, 1.0));
+                        
+                        // Rotate the whole thing
+                        float rotation_speed = time * 0.1;
+                        dir.xy *= rot(rotation_speed);
+                        dir.xz *= rot(rotation_speed * 0.7);
+                        
+                        // Get the tunnel color
+                        vec3 color = tunnel(dir);
+                        
+                        // Add plasma background
+                        color += plasma(uv * 2.0);
+                        
+                        // Add some noise for texture
+                        float n = fbm(uv * 5.0 + time * 0.5) * 0.1;
+                        color += n;
+                        
+                        // Boost contrast and add some pulsing
+                        float pulse = 1.0 + sin(time * 4.0) * 0.3;
+                        color = pow(color, vec3(0.8)) * pulse;
+                        
+                        // Vignette effect
+                        float vignette = 1.0 - length(uv) * 0.5;
+                        color *= vignette;
+                        
+                        gl_FragColor = vec4(color, 1.0);
+                    }
+                `,
+            }, {
+                attributes: ["position"],
+                uniforms: ["worldViewProjection", "time"]
+            });
+
+            let time = 0;
+            shaderMaterial.onBind = () => {
+                shaderMaterial.getEffect().setFloat("time", time);
+                time += 0.016;
+            };
+
+            skybox.material = shaderMaterial;
+            skybox.infiniteDistance = true;
+
+            return skybox;
+        }
+
+        // MAIN APPLICATION CODE
+        document.addEventListener('DOMContentLoaded', () => {
+            const canvas = document.getElementById('renderCanvas');
+            const vehicleNameEl = document.getElementById('vehicleName');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const infoOverlay = document.getElementById('info-overlay');
+            const infoText = document.getElementById('info-text');
+
+            // --- Basic Babylon.js setup ---
+            const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+            let scene;
+            
+            // --- Vehicle configuration ---
+            const TOTAL_VEHICLES = 5;
+            let currentVehicleIndex = 1;
+            let currentVehicleMeshes = null;
+
+            // --- Function to create the scene ---
+            const createScene = () => {
+                const scene = new BABYLON.Scene(engine);
+                scene.clearColor = new BABYLON.Color4(0.1, 0.1, 0.15, 1); // Dark background
+
+                // Create an ArcRotateCamera to view the vehicle
+                // This camera orbits around a target point
+                const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 15, new BABYLON.Vector3(0, 1, 0), scene);
+                camera.attachControl(canvas, true);
+                camera.wheelPrecision = 20; // Controls zoom speed
+                camera.lowerRadiusLimit = 5; // How close you can zoom
+                camera.upperRadiusLimit = 50; // How far you can zoom
+
+                // Create a hemispheric light for ambient lighting
+                const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+                light.intensity = 0.8;
+
+                // Create a directional light for shadows and highlights
+                const dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-0.5, -1, -0.5), scene);
+                dirLight.position = new BABYLON.Vector3(20, 40, 20);
+                dirLight.intensity = 0.7;
+
+                // Create a ground plane
+                const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, scene);
+                const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
+                groundMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+                groundMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
+                ground.material = groundMaterial;
+                ground.receiveShadows = true;
+
+                // Add a shadow generator
+                const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
+                shadowGenerator.useBlurExponentialShadowMap = true;
+                shadowGenerator.blurKernel = 32;
+                dirLight.shadowGenerator = shadowGenerator;
+
+                return scene;
+            };
+
+            // --- Function to show/hide the info overlay ---
+            const showInfo = (message) => {
+                infoText.textContent = message;
+                infoOverlay.style.display = 'block';
+            };
+
+            const hideInfo = () => {
+                infoOverlay.style.display = 'none';
+            };
+            
+            // --- Function to load a vehicle model ---
+            const loadVehicle = (index) => {
+                // 1. Dispose of the old vehicle if it exists
+                if (currentVehicleMeshes) {
+                    currentVehicleMeshes.forEach(mesh => mesh.dispose());
+                    currentVehicleMeshes = null;
+                }
+
+                // 2. Show loading indicator
+                showInfo(`Loading Vehicle ${index}...`);
+                
+                // 3. Define the path to the model
+                // IMPORTANT: You must have your models in the 'assets/vehicle/' folder
+                // For example: assets/vehicle/vehicle1.glb, assets/vehicle/vehicle2.glb, etc.
+                const vehiclePath = `assets/vehicle/`;
+                const vehicleFilename = `vehicle${index}.glb`;
+
+                // 4. Load the new model
+                BABYLON.SceneLoader.ImportMesh("", vehiclePath, vehicleFilename, scene, 
+                    // onSuccess callback
+                    (newMeshes) => {
+                        hideInfo();
+                        currentVehicleMeshes = newMeshes;
+                        // Add shadows to all new meshes
+                        if (scene.lights.length > 1 && scene.lights[1].getShadowGenerator()) {
+                            const shadowGenerator = scene.lights[1].getShadowGenerator();
+                            newMeshes.forEach(mesh => {
+                                if (mesh.name !== "ground") { // Don't cast shadows on the ground itself
+                                    shadowGenerator.addShadowCaster(mesh, true);
+                                }
+                            });
+                        }
+                    },
+                    // onProgress callback (optional)
+                    null,
+                    // onError callback
+                    (scene, message, exception) => {
+                        console.error("Error loading vehicle:", message, exception);
+                        showInfo(`Failed to load ${vehicleFilename}. Make sure the file exists in 'assets/vehicle/'.`);
+                    }
+                );
+            };
+
+            // --- Function to update UI elements ---
+            const updateUI = () => {
+                vehicleNameEl.textContent = `Vehicle ${currentVehicleIndex}`;
+                // Disable/Enable buttons at the start/end
+                prevBtn.disabled = currentVehicleIndex === 1;
+                nextBtn.disabled = currentVehicleIndex === TOTAL_VEHICLES;
+            };
+
+            // --- Event Listeners for buttons ---
+            prevBtn.addEventListener('click', () => {
+                if (currentVehicleIndex > 1) {
+                    currentVehicleIndex--;
+                    updateUI();
+                    loadVehicle(currentVehicleIndex);
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentVehicleIndex < TOTAL_VEHICLES) {
+                    currentVehicleIndex++;
+                    updateUI();
+                    loadVehicle(currentVehicleIndex);
+                }
+            });
+
+            // --- Initialize the scene and load the first vehicle ---
+            scene = createScene();
+            createSkybox(scene);
+            updateUI();
+            loadVehicle(currentVehicleIndex);
+
+            // --- Render loop ---
+            engine.runRenderLoop(() => {
+                if (scene) {
+                    scene.render();
+                }
+            });
+
+            // --- Handle window resize ---
+            window.addEventListener('resize', () => {
+                engine.resize();
+            });
+        });
+    </script>
+
+</body>
+</html>
