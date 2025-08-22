@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Babylon.js Vehicle Displayer</title>
+    <title>3D Vehicle Garage</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Babylon.js Core and Loader scripts -->
@@ -262,6 +262,15 @@
             const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
             let scene;
             
+            // --- Draco Compression Configuration ---
+            BABYLON.DracoCompression.Configuration = {
+                decoder: {
+                    wasmUrl: "https://cdn.babylonjs.com/draco_wasm_wrapper_babylon.js",
+                    wasmBinaryUrl: "https://cdn.babylonjs.com/draco_decoder_gltf.wasm",
+                    fallbackUrl: "https://cdn.babylonjs.com/draco_decoder_gltf.js"
+                }
+            };
+
             // --- Vehicle configuration ---
             const TOTAL_VEHICLES = 5;
             let currentVehicleIndex = 1;
