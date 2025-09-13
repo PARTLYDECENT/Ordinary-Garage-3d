@@ -43,6 +43,24 @@
             padding: 1rem;
             z-index: 10;
             display: none; /* Hidden by default */
+            max-height: calc(100vh - 10rem); /* Leave space for controls */
+            overflow-y: auto;
+        }
+        /* Responsive toolbox for mobile */
+        @media (max-width: 640px) {
+            #toolbox {
+                width: 90%;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+        }
+        /* Lore popup animation */
+        @keyframes fade-in-right {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .animate-fade-in-right {
+            animation: fade-in-right 0.5s ease-out forwards;
         }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,9 +71,7 @@
 
     <canvas id="renderCanvas"></canvas>
 
-    <div id="vehicle-name-overlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 bg-opacity-70 text-white text-xl font-bold px-4 py-2 rounded-lg pointer-events-none z-10" style="display: none;">
-        <span id="vehicle-display-name"></span>
-    </div>
+    <div id="lore-popups" class="absolute top-5 right-5 w-64 space-y-2 z-10 pointer-events-none"></div>
 
     <div id="enter-overlay" class="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
         <button id="enterBtn" class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-2xl font-bold rounded-lg transition-colors duration-300">
@@ -76,6 +92,7 @@
         <h3 class="text-lg font-bold mb-2">Vehicle Tools</h3>
         <button id="colorBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-2">Change Color</button>
         <button id="wireframeBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-2">Toggle Wireframe</button>
+        <button id="propRotationBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-2">Toggle Prop Rotation</button>
         <button id="autoOrbitBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-4">Toggle Auto Orbit</button>
         
         <h3 class="text-lg font-bold mb-2">Scene Tools</h3>
@@ -86,24 +103,30 @@
         <button id="toggleFogBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Toggle Fog</button>
         <button id="changeGroundBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-4">Change Ground</button>
         
+        <h3 class="text-lg font-bold mb-2">Media</h3>
+        <button id="changeSongBtn" class="w-full text-left px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-300 mb-2">Change Song</button>
+        <button id="changeVideoBtn" class="w-full text-left px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition-colors duration-300 mb-4">Change Video</button>
+
         <h3 class="text-lg font-bold mb-2">Utilities</h3>
         <button id="screenshotBtn" class="w-full text-left px-4 py-2 bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors duration-300">Take Screenshot</button>
     </div>
 
-    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-gray-800 bg-opacity-80 p-3 rounded-xl shadow-lg">
-        <button id="prevBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-        </button>
-        
-        <div class="text-center">
-            <h2 id="vehicleName" class="text-xl font-bold w-48">Vehicle 1</h2>
+    <div class="absolute bottom-5 left-1/2 -translate-x-1/2 w-11/12 max-w-lg sm:w-auto flex flex-col sm:flex-row items-center gap-2 bg-gray-800 bg-opacity-80 p-3 rounded-xl shadow-lg">
+        <div class="flex items-center justify-between w-full sm:w-auto sm:gap-4">
+            <button id="prevBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            
+            <div class="text-center">
+                <h2 id="vehicleName" class="text-xl font-bold whitespace-nowrap px-2">Vehicle 1</h2>
+            </div>
+
+            <button id="nextBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+            </button>
         </div>
 
-        <button id="nextBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-        </button>
-
-        <button id="toggleToolboxBtn" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors duration-300">
+        <button id="toggleToolboxBtn" class="w-full sm:w-auto mt-2 sm:mt-0 px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors duration-300">
             Toggle Toolbox
         </button>
     </div>
@@ -123,6 +146,7 @@
             const infoText = document.getElementById('info-text');
             const enterBtn = document.getElementById('enterBtn');
             const enterOverlay = document.getElementById('enter-overlay');
+            const lorePopupContainer = document.getElementById('lore-popups');
 
             // --- Toolbox elements ---
             const toolbox = document.getElementById('toolbox');
@@ -133,11 +157,14 @@
             const toggleLightsBtn = document.getElementById('toggleLightsBtn');
             const toggleToolboxBtn = document.getElementById('toggleToolboxBtn');
             const autoOrbitBtn = document.getElementById('autoOrbitBtn');
+            const propRotationBtn = document.getElementById('propRotationBtn');
             // New toolbox buttons
             const screenshotBtn = document.getElementById('screenshotBtn');
             const toggleFogBtn = document.getElementById('toggleFogBtn');
             const toggleSkyboxBtn = document.getElementById('toggleSkyboxBtn');
             const changeGroundBtn = document.getElementById('changeGroundBtn');
+            const changeSongBtn = document.getElementById('changeSongBtn');
+            const changeVideoBtn = document.getElementById('changeVideoBtn');
 
             // --- Music elements ---
             const bgMusic = [
@@ -145,10 +172,9 @@
                 document.getElementById('bg_music_3'), document.getElementById('bg_music_4'),
                 document.getElementById('bg_music_5'), document.getElementById('bg_music_6')
             ];
+            let activeMusic = null;
 
-            // --- Vehicle naming elements ---
-            const vehicleNameOverlay = document.getElementById('vehicle-name-overlay');
-            const vehicleDisplayName = document.getElementById('vehicle-display-name');
+            
             const vehicleNames = [
                 "", "Odysee", "Mining Ship", "Material Handler", "Advanced Ship", "S2 Concept", "Unknown Vehicle"
             ];
@@ -170,10 +196,75 @@
             const TOTAL_VEHICLES = 6;
             let currentVehicleIndex = 1;
             let currentVehicleMeshes = null;
+            let isVehicleRotating = false;
             
             // --- Scene assets ---
             const groundTextureUrls = ["plane.jpg", "plane2.jpg", "concrete.jpg"]; // Add more texture paths here
             let currentGroundTextureIndex = 0;
+            const videoUrls = ["vid1.mp4", "vid2.mp4", "vid4.mp4", "vid5.mp4", "vid6.mp4"];
+            let currentVideoIndex = 0;
+            let videoTexture;
+            let playNextVideo;
+
+            // --- Lore & Popups ---
+            const loreData = {
+                1: [
+                    "The Odysee model by Ordinary Technology was the first to feature their proprietary 'Starlight' short-range FTL drive.",
+                    "Early models of the Odysee were prone to unexpected navigation system reboots. OT insists this is fixed in the current version."
+                ],
+                2: [
+                    "Ordinary Technology's 'Goliath' series mining ships are known for their durability, capable of operating in the most hazardous asteroid fields.",
+                    "The primary mining laser on this model has enough power to crack a small moon, according to OT's marketing materials."
+                ],
+                3: [
+                    "The 'Hercules' material handler is the backbone of OT's orbital construction platforms. Its powerful tractor beams can move objects a hundred times its own mass.",
+                    "Despite its industrial purpose, the 'Hercules' has surprisingly comfortable crew quarters, a rare luxury in OT designs."
+                ],
+                4: [
+                    "Designated 'X-7', this advanced prototype from Ordinary Technology is rumored to have cloaking capabilities, though OT officially denies it.",
+                    "The unique energy signature of the 'X-7' has led to it being mistaken for a cosmic anomaly on several occasions."
+                ],
+                5: [
+                    "The 'S2 Concept' was a design study by Ordinary Technology to explore organic-inspired ship geometries. It never went into full production.",
+                    "The S2's hull is made from a self-repairing polymer, a technology that OT later perfected for its military contracts."
+                ],
+                6: [
+                    "This vessel's origin is unknown. Salvage teams found it adrift. Some speculate it's a secret military project from Ordinary Technology, but its design is unlike any of their known ships.",
+                    "Scans of the 'Unknown Vehicle' show energy patterns that are inconsistent with known human technology. OT has placed a high bounty on its recovery."
+                ],
+                generic: [
+                    "All vehicles from Ordinary Technology are certified for both atmospheric and deep-space flight.",
+                    "Ordinary Technology prides itself on creating vessels that are as reliable as they are unremarkable.",
+                    "The standard OT-issue cockpit interface has won numerous awards for its 'intuitive, if uninspired' design."
+                ]
+            };
+
+            const showLorePopup = () => {
+                const vehicleLore = loreData[currentVehicleIndex] || [];
+                const allLore = [...vehicleLore, ...loreData.generic];
+                const loreText = allLore[Math.floor(Math.random() * allLore.length)];
+
+                const popup = document.createElement('div');
+                popup.className = 'relative bg-gray-800 bg-opacity-90 p-4 rounded-lg shadow-xl text-white text-sm pointer-events-auto animate-fade-in-right';
+                
+                const text = document.createElement('p');
+                text.textContent = loreText;
+
+                const closeBtn = document.createElement('button');
+                closeBtn.innerHTML = '&times;';
+                closeBtn.className = 'absolute top-1 right-2 text-gray-400 hover:text-white';
+                closeBtn.onclick = () => popup.remove();
+
+                popup.appendChild(text);
+                popup.appendChild(closeBtn);
+                
+                if (lorePopupContainer) lorePopupContainer.appendChild(popup);
+
+                // Automatically remove after some time
+                setTimeout(() => {
+                    popup.remove();
+                }, 15000); // 15 seconds
+            };
 
             // --- Function to create the scene ---
             const createScene = () => {
@@ -244,10 +335,6 @@
                 shadowGenerator.addShadowCaster(roof);
 
                 // --- Video Screen Playlist Logic ---
-                const videoUrls = ["vid1.mp4", "vid2.mp4", "vid4.mp4", "vid5.mp4", "vid6.mp4"];
-                let currentVideoIndex = 0;
-                let videoTexture;
-
                 const videoScreen = BABYLON.MeshBuilder.CreatePlane("videoScreen", { width: 16, height: 9 }, scene); // 16:9 aspect ratio
                 videoScreen.position = new BABYLON.Vector3(garageWidth / 2 + 0.01, garageHeight * 0.65, 0); // Position on upper right wall
                 videoScreen.rotation.y = -Math.PI / 2; // Rotate to face inwards
@@ -259,7 +346,7 @@
                 videoMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1); // Make it glow
                 videoScreen.material = videoMaterial;
 
-                const playNextVideo = () => {
+                playNextVideo = () => {
                     if (videoTexture) {
                         videoTexture.dispose();
                     }
@@ -300,8 +387,7 @@
                 }
 
                 showInfo(`Loading Vehicle ${index}...`);
-                vehicleDisplayName.textContent = vehicleNames[index];
-                vehicleNameOverlay.style.display = 'block';
+                
                 
                 const vehiclePath = `assets/vehicle/`;
                 const vehicleFilename = `vehicle${index}.glb`;
@@ -385,6 +471,10 @@
                     camera.useAutoRotationBehavior = true;
                 }
             };
+
+            const togglePropRotation = () => {
+                isVehicleRotating = !isVehicleRotating;
+            };
             
             // --- NEW Toolbox Functions ---
             const takeScreenshot = () => BABYLON.Tools.CreateScreenshotUsingRenderTarget(engine, camera, { width: 1920, height: 1080 });
@@ -394,6 +484,23 @@
                 if (ground && ground.material) {
                     currentGroundTextureIndex = (currentGroundTextureIndex + 1) % groundTextureUrls.length;
                     ground.material.diffuseTexture = new BABYLON.Texture(groundTextureUrls[currentGroundTextureIndex], scene);
+                }
+            };
+
+            const changeSong = () => {
+                if (activeMusic) {
+                    activeMusic.pause();
+                    activeMusic.currentTime = 0;
+                }
+                const randomIndex = Math.floor(Math.random() * bgMusic.length);
+                activeMusic = bgMusic[randomIndex];
+                activeMusic.play().catch(e => console.error("Music play failed:", e));
+            };
+
+            const changeVideo = () => {
+                currentVideoIndex = (currentVideoIndex + 1) % videoUrls.length;
+                if (playNextVideo) {
+                    playNextVideo();
                 }
             };
 
@@ -425,17 +532,27 @@
             toggleGroundBtn.addEventListener('click', toggleGround);
             toggleLightsBtn.addEventListener('click', toggleLights);
             autoOrbitBtn.addEventListener('click', toggleAutoOrbit);
+            propRotationBtn.addEventListener('click', togglePropRotation);
             screenshotBtn.addEventListener('click', takeScreenshot);
             toggleFogBtn.addEventListener('click', toggleFog);
             toggleSkyboxBtn.addEventListener('click', toggleSkybox);
             changeGroundBtn.addEventListener('click', changeGroundTexture);
+            changeSongBtn.addEventListener('click', changeSong);
+            changeVideoBtn.addEventListener('click', changeVideo);
             
             toggleToolboxBtn.addEventListener('click', () => toolbox.style.display = (toolbox.style.display === 'none' ? 'block' : 'none'));
 
             const playRandomTune = () => {
                 enterOverlay.style.display = 'none';
-                const randomIndex = Math.floor(Math.random() * bgMusic.length);
-                bgMusic[randomIndex].play().catch(e => console.error("Music play failed:", e));
+                changeSong();
+                // Start lore popups after entering
+                setInterval(() => {
+                    if (toolbox.style.display === 'none' && lorePopupContainer.children.length < 3) {
+                        if (Math.random() < 0.2) { // 20% chance every 5 seconds
+                            showLorePopup();
+                        }
+                    }
+                }, 5000);
             };
             enterBtn.addEventListener('click', playRandomTune);
 
@@ -448,24 +565,15 @@
             // --- Render loop ---
             engine.runRenderLoop(() => {
                 if (!scene) return;
-                scene.render();
-                if (currentVehicleMeshes && currentVehicleMeshes.length > 0) {
-                    const mainMesh = currentVehicleMeshes[0];
-                    const bb = mainMesh.getBoundingInfo().boundingBox;
-                    const worldCoord = bb.centerWorld.add(new BABYLON.Vector3(0, bb.extendSize.y, 0));
-                    const screenCoord = BABYLON.Vector3.Project(worldCoord, mainMesh.getWorldMatrix(), scene.getTransformMatrix(), camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()));
-                    
-                    if (screenCoord.z > 0 && screenCoord.z < 1) {
-                        vehicleNameOverlay.style.display = 'block';
-                        vehicleNameOverlay.style.left = `${screenCoord.x}px`;
-                        vehicleNameOverlay.style.top = `${screenCoord.y}px`;
-                        vehicleNameOverlay.style.transform = 'translate(-50%, -200%)'; // Position above point
-                    } else {
-                        vehicleNameOverlay.style.display = 'none';
+
+                if (isVehicleRotating && currentVehicleMeshes && currentVehicleMeshes.length > 0) {
+                    if (currentVehicleMeshes[0].rotation) {
+                        currentVehicleMeshes[0].rotation.y += 0.005;
                     }
-                } else {
-                    vehicleNameOverlay.style.display = 'none';
                 }
+
+                scene.render();
+                
             });
 
             window.addEventListener('resize', () => engine.resize());
