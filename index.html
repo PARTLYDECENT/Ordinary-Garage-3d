@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Vehicle Garage</title>
-    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Babylon.js Core and Loader scripts -->
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
+    <script src="skybox.js"></script>
     <style>
         /* Custom font and ensuring canvas takes full space */
         body {
@@ -34,6 +33,17 @@
             z-index: 10;
             display: none; /* Hidden by default */
         }
+        #toolbox {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            z-index: 10;
+            display: none; /* Hidden by default */
+        }
     </style>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -41,214 +51,68 @@
 </head>
 <body class="bg-gray-900 text-white">
 
-    <!-- The canvas where the 3D scene will be rendered -->
     <canvas id="renderCanvas"></canvas>
 
-    <!-- UI Controls for switching vehicles -->
+    <div id="vehicle-name-overlay" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-gray-800 bg-opacity-70 text-white text-xl font-bold px-4 py-2 rounded-lg pointer-events-none z-10" style="display: none;">
+        <span id="vehicle-display-name"></span>
+    </div>
+
+    <div id="enter-overlay" class="absolute inset-0 bg-gray-900 flex items-center justify-center z-20">
+        <button id="enterBtn" class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white text-2xl font-bold rounded-lg transition-colors duration-300">
+            Enter
+        </button>
+    </div>
+
+    <audio id="bg_music_1" src="tune1.wav" loop preload="auto"></audio>
+    <audio id="bg_music_2" src="tune2.wav" loop preload="auto"></audio>
+    <audio id="bg_music_3" src="tune3.wav" loop preload="auto"></audio>
+    <audio id="bg_music_4" src="tune4.wav" loop preload="auto"></audio>
+    <audio id="bg_music_5" src="tune5.wav" loop preload="auto"></audio>
+    <audio id="bg_music_6" src="tune6.wav" loop preload="auto"></audio>
+
+    <video id="tvVideoPlayer" style="display: none;" playsinline webkit-playsinline muted></video>
+
+    <div id="toolbox">
+        <h3 class="text-lg font-bold mb-2">Vehicle Tools</h3>
+        <button id="colorBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-2">Change Color</button>
+        <button id="wireframeBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-2">Toggle Wireframe</button>
+        <button id="autoOrbitBtn" class="w-full text-left px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 mb-4">Toggle Auto Orbit</button>
+        
+        <h3 class="text-lg font-bold mb-2">Scene Tools</h3>
+        <button id="resetCameraBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Reset Camera</button>
+        <button id="toggleGroundBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Toggle Ground</button>
+        <button id="toggleLightsBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Toggle Lights</button>
+        <button id="toggleSkyboxBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Toggle Skybox</button>
+        <button id="toggleFogBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-2">Toggle Fog</button>
+        <button id="changeGroundBtn" class="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors duration-300 mb-4">Change Ground</button>
+        
+        <h3 class="text-lg font-bold mb-2">Utilities</h3>
+        <button id="screenshotBtn" class="w-full text-left px-4 py-2 bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors duration-300">Take Screenshot</button>
+    </div>
+
     <div class="absolute bottom-5 left-1/2 -translate-x-1/2 flex items-center gap-4 bg-gray-800 bg-opacity-80 p-3 rounded-xl shadow-lg">
-        <!-- Previous Button -->
         <button id="prevBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
         </button>
         
-        <!-- Vehicle Name Display -->
         <div class="text-center">
             <h2 id="vehicleName" class="text-xl font-bold w-48">Vehicle 1</h2>
         </div>
 
-        <!-- Next Button -->
         <button id="nextBtn" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors duration-300 disabled:bg-gray-600 disabled:cursor-not-allowed">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-right"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
         </button>
+
+        <button id="toggleToolboxBtn" class="px-5 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors duration-300">
+            Toggle Toolbox
+        </button>
     </div>
 
-    <!-- Overlay for loading and error messages -->
     <div id="info-overlay">
         <p id="info-text"></p>
     </div>
 
     <script>
-        // SKYBOX FUNCTION - Wild Grid Shader
-        function createSkybox(scene) {
-            const skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
-
-            const shaderMaterial = new BABYLON.ShaderMaterial("skyShader", scene, {
-                vertexSource: `
-                    precision highp float;
-
-                    // Attributes
-                    attribute vec3 position;
-
-                    // Uniforms
-                    uniform mat4 worldViewProjection;
-
-                    // Varying
-                    varying vec3 vPosition;
-
-                    void main(void) {
-                        vPosition = position;
-                        gl_Position = worldViewProjection * vec4(position, 1.0);
-                    }
-                `,
-                fragmentSource: `
-                    precision highp float;
-
-                    varying vec3 vPosition;
-                    uniform float time;
-
-                    // Rotation matrix
-                    mat2 rot(float a) {
-                        float c = cos(a);
-                        float s = sin(a);
-                        return mat2(c, -s, s, c);
-                    }
-
-                    // Hash function for randomness
-                    float hash(vec2 p) {
-                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-                    }
-
-                    // Noise function
-                    float noise(vec2 p) {
-                        vec2 i = floor(p);
-                        vec2 f = fract(p);
-                        f = f * f * (3.0 - 2.0 * f);
-                        
-                        float a = hash(i);
-                        float b = hash(i + vec2(1.0, 0.0));
-                        float c = hash(i + vec2(0.0, 1.0));
-                        float d = hash(i + vec2(1.0, 1.0));
-                        
-                        return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-                    }
-
-                    // Fractal noise
-                    float fbm(vec2 p) {
-                        float value = 0.0;
-                        float amplitude = 0.5;
-                        for(int i = 0; i < 6; i++) {
-                            value += amplitude * noise(p);
-                            p *= 2.0;
-                            amplitude *= 0.5;
-                        }
-                        return value;
-                    }
-
-                    // Grid function with morphing
-                    float grid(vec2 p, float scale, float morph) {
-                        p *= scale;
-                        
-                        // Add some warping
-                        p += vec2(sin(p.y * 0.5 + time * 2.0), cos(p.x * 0.3 + time * 1.5)) * morph;
-                        
-                        vec2 grid_p = abs(fract(p) - 0.5);
-                        float line_width = 0.02 + 0.03 * sin(time * 3.0 + length(p) * 0.1);
-                        
-                        return smoothstep(line_width, line_width * 0.5, min(grid_p.x, grid_p.y));
-                    }
-
-                    // Tunnel effect
-                    vec3 tunnel(vec3 dir) {
-                        float t = time * 0.5;
-                        vec2 uv = dir.xy / (dir.z + 0.5);
-                        
-                        // Rotate the tunnel
-                        uv *= rot(t * 0.2);
-                        
-                        // Multiple grid layers with different scales and colors
-                        float grid1 = grid(uv, 8.0 + sin(t) * 4.0, 0.3);
-                        float grid2 = grid(uv, 16.0 + cos(t * 1.3) * 8.0, 0.2);
-                        float grid3 = grid(uv, 32.0 + sin(t * 0.7) * 16.0, 0.1);
-                        
-                        // Color the grids
-                        vec3 col1 = vec3(1.0, 0.2, 0.8) * grid1; // Hot pink
-                        vec3 col2 = vec3(0.2, 1.0, 0.8) * grid2; // Cyan
-                        vec3 col3 = vec3(0.8, 0.8, 0.2) * grid3; // Yellow
-                        
-                        // Combine with additive blending
-                        vec3 color = col1 + col2 + col3;
-                        
-                        // Add some glow based on distance
-                        float dist = length(uv) * 0.1;
-                        color *= (1.0 + sin(dist - t * 2.0) * 0.5);
-                        
-                        // Fade with depth
-                        float depth_fade = 1.0 / (1.0 + dir.z * dir.z * 0.1);
-                        color *= depth_fade;
-                        
-                        return color;
-                    }
-
-                    // Plasma background
-                    vec3 plasma(vec2 p) {
-                        float t = time * 0.3;
-                        float x = p.x;
-                        float y = p.y;
-                        
-                        float v = sin((x * 10.0 + t));
-                        v += sin((y * 10.0 + t) / 2.0);
-                        v += sin((x * 10.0 + y * 10.0 + t) / 2.0);
-                        
-                        float cx = x + 0.5 * sin(t / 5.0);
-                        float cy = y + 0.5 * cos(t / 3.0);
-                        v += sin(sqrt(100.0 * (cx * cx + cy * cy) + 1.0) + t);
-                        
-                        v = v / 4.0;
-                        
-                        return vec3(
-                            sin(v * 3.14159),
-                            sin(v * 3.14159 + 2.0 * 3.14159 / 3.0),
-                            sin(v * 3.14159 + 4.0 * 3.14159 / 3.0)
-                        ) * 0.3;
-                    }
-
-                    void main() {
-                        vec2 uv = vPosition.xy;
-                        vec3 dir = normalize(vec3(uv, 1.0));
-                        
-                        // Rotate the whole thing
-                        float rotation_speed = time * 0.1;
-                        dir.xy *= rot(rotation_speed);
-                        dir.xz *= rot(rotation_speed * 0.7);
-                        
-                        // Get the tunnel color
-                        vec3 color = tunnel(dir);
-                        
-                        // Add plasma background
-                        color += plasma(uv * 2.0);
-                        
-                        // Add some noise for texture
-                        float n = fbm(uv * 5.0 + time * 0.5) * 0.1;
-                        color += n;
-                        
-                        // Boost contrast and add some pulsing
-                        float pulse = 1.0 + sin(time * 4.0) * 0.3;
-                        color = pow(color, vec3(0.8)) * pulse;
-                        
-                        // Vignette effect
-                        float vignette = 1.0 - length(uv) * 0.5;
-                        color *= vignette;
-                        
-                        gl_FragColor = vec4(color, 1.0);
-                    }
-                `,
-            }, {
-                attributes: ["position"],
-                uniforms: ["worldViewProjection", "time"]
-            });
-
-            let time = 0;
-            shaderMaterial.onBind = () => {
-                shaderMaterial.getEffect().setFloat("time", time);
-                time += 0.016;
-            };
-
-            skybox.material = shaderMaterial;
-            skybox.infiniteDistance = true;
-
-            return skybox;
-        }
-
         // MAIN APPLICATION CODE
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('renderCanvas');
@@ -257,11 +121,42 @@
             const nextBtn = document.getElementById('nextBtn');
             const infoOverlay = document.getElementById('info-overlay');
             const infoText = document.getElementById('info-text');
+            const enterBtn = document.getElementById('enterBtn');
+            const enterOverlay = document.getElementById('enter-overlay');
 
-            // --- Basic Babylon.js setup ---
-            const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
-            let scene;
+            // --- Toolbox elements ---
+            const toolbox = document.getElementById('toolbox');
+            const colorBtn = document.getElementById('colorBtn');
+            const wireframeBtn = document.getElementById('wireframeBtn');
+            const resetCameraBtn = document.getElementById('resetCameraBtn');
+            const toggleGroundBtn = document.getElementById('toggleGroundBtn');
+            const toggleLightsBtn = document.getElementById('toggleLightsBtn');
+            const toggleToolboxBtn = document.getElementById('toggleToolboxBtn');
+            const autoOrbitBtn = document.getElementById('autoOrbitBtn');
+            // New toolbox buttons
+            const screenshotBtn = document.getElementById('screenshotBtn');
+            const toggleFogBtn = document.getElementById('toggleFogBtn');
+            const toggleSkyboxBtn = document.getElementById('toggleSkyboxBtn');
+            const changeGroundBtn = document.getElementById('changeGroundBtn');
+
+            // --- Music elements ---
+            const bgMusic = [
+                document.getElementById('bg_music_1'), document.getElementById('bg_music_2'),
+                document.getElementById('bg_music_3'), document.getElementById('bg_music_4'),
+                document.getElementById('bg_music_5'), document.getElementById('bg_music_6')
+            ];
+
+            // --- Vehicle naming elements ---
+            const vehicleNameOverlay = document.getElementById('vehicle-name-overlay');
+            const vehicleDisplayName = document.getElementById('vehicle-display-name');
+            const vehicleNames = [
+                "", "Odysee", "Mining Ship", "Material Handler", "Advanced Ship", "S2 Concept", "Unknown Vehicle"
+            ];
             
+            // --- Babylon.js setup ---
+            const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+            let scene, camera, ground, light, dirLight, warSky;
+
             // --- Draco Compression Configuration ---
             BABYLON.DracoCompression.Configuration = {
                 decoder: {
@@ -272,50 +167,123 @@
             };
 
             // --- Vehicle configuration ---
-            const TOTAL_VEHICLES = 5;
+            const TOTAL_VEHICLES = 6;
             let currentVehicleIndex = 1;
             let currentVehicleMeshes = null;
+            
+            // --- Scene assets ---
+            const groundTextureUrls = ["plane.jpg", "plane2.jpg", "concrete.jpg"]; // Add more texture paths here
+            let currentGroundTextureIndex = 0;
 
             // --- Function to create the scene ---
             const createScene = () => {
                 const scene = new BABYLON.Scene(engine);
-                scene.clearColor = new BABYLON.Color4(0.1, 0.1, 0.15, 1); // Dark background
+                scene.clearColor = new BABYLON.Color4(0.1, 0.1, 0.15, 1);
 
-                // Create an ArcRotateCamera to view the vehicle
-                // This camera orbits around a target point
-                const camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 15, new BABYLON.Vector3(0, 1, 0), scene);
+                // --- Fog Setup ---
+                scene.fogMode = BABYLON.Scene.FOGMODE_EXP;
+                scene.fogDensity = 0.01;
+                scene.fogColor = new BABYLON.Color3(0.1, 0.1, 0.15);
+                scene.fogEnabled = false; // Initially disabled
+
+                camera = new BABYLON.ArcRotateCamera("camera", -Math.PI / 2, Math.PI / 2.5, 15, new BABYLON.Vector3(0, 1, 0), scene);
                 camera.attachControl(canvas, true);
-                camera.wheelPrecision = 20; // Controls zoom speed
-                camera.lowerRadiusLimit = 5; // How close you can zoom
-                camera.upperRadiusLimit = 50; // How far you can zoom
+                camera.wheelPrecision = 20;
+                camera.lowerRadiusLimit = 5;
+                camera.upperRadiusLimit = 50;
+                camera.panningSensibility = 100;
+                camera.panningKeyCode = 16;
 
-                // Create a hemispheric light for ambient lighting
-                const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+                light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
                 light.intensity = 0.8;
 
-                // Create a directional light for shadows and highlights
-                const dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-0.5, -1, -0.5), scene);
+                dirLight = new BABYLON.DirectionalLight("dirLight", new BABYLON.Vector3(-0.5, -1, -0.5), scene);
                 dirLight.position = new BABYLON.Vector3(20, 40, 20);
                 dirLight.intensity = 0.7;
 
-                // Create a ground plane
-                const ground = BABYLON.MeshBuilder.CreateGround("ground", { width: 50, height: 50 }, scene);
+                ground = BABYLON.MeshBuilder.CreateBox("ground", { width: 50, height: 1, depth: 50 }, scene);
+                ground.position.y = -0.5;
                 const groundMaterial = new BABYLON.StandardMaterial("groundMat", scene);
-                groundMaterial.diffuseColor = new BABYLON.Color3(0.3, 0.3, 0.35);
+                groundMaterial.diffuseTexture = new BABYLON.Texture(groundTextureUrls[0], scene);
                 groundMaterial.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
                 ground.material = groundMaterial;
                 ground.receiveShadows = true;
 
-                // Add a shadow generator
                 const shadowGenerator = new BABYLON.ShadowGenerator(1024, dirLight);
                 shadowGenerator.useBlurExponentialShadowMap = true;
                 shadowGenerator.blurKernel = 32;
                 dirLight.shadowGenerator = shadowGenerator;
 
+                // --- Garage Elements ---
+                const garageMaterial = new BABYLON.StandardMaterial("garageMat", scene);
+                garageMaterial.diffuseTexture = new BABYLON.Texture("plane2.jpg", scene);
+                garageMaterial.backFaceCulling = false;
+
+                const garageWidth = 40, garageDepth = 40, garageHeight = 20;
+
+                const backWall = BABYLON.MeshBuilder.CreateBox("backWall", { width: garageWidth, height: garageHeight, depth: 0.1 }, scene);
+                backWall.position = new BABYLON.Vector3(0, garageHeight / 2, garageDepth / 2 - 0.05);
+                backWall.material = garageMaterial;
+                shadowGenerator.addShadowCaster(backWall);
+
+                const leftWall = BABYLON.MeshBuilder.CreateBox("leftWall", { width: garageDepth, height: garageHeight, depth: 0.1 }, scene);
+                leftWall.position = new BABYLON.Vector3(-garageWidth / 2 + 0.05, garageHeight / 2, 0);
+                leftWall.rotation.y = Math.PI / 2;
+                leftWall.material = garageMaterial;
+                shadowGenerator.addShadowCaster(leftWall);
+
+                const rightWall = BABYLON.MeshBuilder.CreateBox("rightWall", { width: garageDepth, height: garageHeight, depth: 0.1 }, scene);
+                rightWall.position = new BABYLON.Vector3(garageWidth / 2 - 0.05, garageHeight / 2, 0);
+                rightWall.rotation.y = -Math.PI / 2;
+                rightWall.material = garageMaterial;
+                shadowGenerator.addShadowCaster(rightWall);
+
+                const roof = BABYLON.MeshBuilder.CreateBox("roof", { width: garageWidth, height: 0.1, depth: garageDepth }, scene);
+                roof.position = new BABYLON.Vector3(0, garageHeight - 0.05, 0);
+                roof.material = garageMaterial;
+                shadowGenerator.addShadowCaster(roof);
+
+                // --- Video Screen Playlist Logic ---
+                const videoUrls = ["vid1.mp4", "vid2.mp4", "vid4.mp4", "vid5.mp4", "vid6.mp4"];
+                let currentVideoIndex = 0;
+                let videoTexture;
+
+                const videoScreen = BABYLON.MeshBuilder.CreatePlane("videoScreen", { width: 16, height: 9 }, scene); // 16:9 aspect ratio
+                videoScreen.position = new BABYLON.Vector3(garageWidth / 2 + 0.01, garageHeight * 0.65, 0); // Position on upper right wall
+                videoScreen.rotation.y = -Math.PI / 2; // Rotate to face inwards
+                videoScreen.rotation.z = Math.PI; // Rotate 180 degrees to make it upside down
+
+                
+
+                const videoMaterial = new BABYLON.StandardMaterial("videoMaterial", scene);
+                videoMaterial.emissiveColor = new BABYLON.Color3(1, 1, 1); // Make it glow
+                videoScreen.material = videoMaterial;
+
+                const playNextVideo = () => {
+                    if (videoTexture) {
+                        videoTexture.dispose();
+                    }
+                    const videoUrl = videoUrls[currentVideoIndex];
+                    videoTexture = new BABYLON.VideoTexture("video", videoUrl, scene, true, true);
+                    videoMaterial.diffuseTexture = videoTexture;
+
+                    videoTexture.video.muted = true;
+                    videoTexture.video.play().catch(e => console.error(`Autoplay failed for ${videoUrl}:`, e));
+
+                    videoTexture.video.onended = () => {
+                        currentVideoIndex = (currentVideoIndex + 1) % videoUrls.length; // Loop to next video
+                        playNextVideo();
+                    };
+                };
+                
+                // Start playing the video playlist once the scene is ready
+                scene.onReadyObservable.addOnce(() => {
+                    playNextVideo();
+                });
+
                 return scene;
             };
 
-            // --- Function to show/hide the info overlay ---
             const showInfo = (message) => {
                 infoText.textContent = message;
                 infoOverlay.style.display = 'block';
@@ -325,93 +293,183 @@
                 infoOverlay.style.display = 'none';
             };
             
-            // --- Function to load a vehicle model ---
             const loadVehicle = (index) => {
-                // 1. Dispose of the old vehicle if it exists
                 if (currentVehicleMeshes) {
                     currentVehicleMeshes.forEach(mesh => mesh.dispose());
                     currentVehicleMeshes = null;
                 }
 
-                // 2. Show loading indicator
                 showInfo(`Loading Vehicle ${index}...`);
+                vehicleDisplayName.textContent = vehicleNames[index];
+                vehicleNameOverlay.style.display = 'block';
                 
-                // 3. Define the path to the model
-                // IMPORTANT: You must have your models in the 'assets/vehicle/' folder
-                // For example: assets/vehicle/vehicle1.glb, assets/vehicle/vehicle2.glb, etc.
                 const vehiclePath = `assets/vehicle/`;
                 const vehicleFilename = `vehicle${index}.glb`;
 
-                // 4. Load the new model
                 BABYLON.SceneLoader.ImportMesh("", vehiclePath, vehicleFilename, scene, 
-                    // onSuccess callback
                     (newMeshes) => {
                         hideInfo();
                         currentVehicleMeshes = newMeshes;
-                        // Add shadows to all new meshes
-                        if (scene.lights.length > 1 && scene.lights[1].getShadowGenerator()) {
-                            const shadowGenerator = scene.lights[1].getShadowGenerator();
-                            newMeshes.forEach(mesh => {
-                                if (mesh.name !== "ground") { // Don't cast shadows on the ground itself
-                                    shadowGenerator.addShadowCaster(mesh, true);
-                                }
-                            });
+                        
+                        const mainVehicleMesh = currentVehicleMeshes[0];
+                        if (mainVehicleMesh.animations.length === 0) { // Add bob only if not already animated
+                            const startY = mainVehicleMesh.position.y;
+                            const bobbingAnimation = new BABYLON.Animation("bobbing", "position.y", 30, BABYLON.Animation.ANIMATIONTYPE_FLOAT, BABYLON.Animation.ANIMATIONLOOPMODE_CYCLE);
+                            bobbingAnimation.setKeys([
+                                { frame: 0, value: startY }, { frame: 30, value: startY + 0.1 },
+                                { frame: 60, value: startY }, { frame: 90, value: startY - 0.1 },
+                                { frame: 120, value: startY }
+                            ]);
+                            mainVehicleMesh.animations.push(bobbingAnimation);
+                            scene.beginAnimation(mainVehicleMesh, 0, 120, true);
+                        }
+
+                        const shadowGenerator = dirLight.getShadowGenerator();
+                        if (shadowGenerator) {
+                            newMeshes.forEach(mesh => shadowGenerator.addShadowCaster(mesh, true));
                         }
                     },
-                    // onProgress callback (optional)
                     null,
-                    // onError callback
                     (scene, message, exception) => {
                         console.error("Error loading vehicle:", message, exception);
-                        showInfo(`Failed to load ${vehicleFilename}. Make sure the file exists in 'assets/vehicle/'.`);
+                        showInfo(`Failed to load ${vehicleFilename}.`);
                     }
                 );
             };
 
-            // --- Function to update UI elements ---
+            // --- Toolbox Functions ---
+            const changeVehicleColor = () => {
+                if (currentVehicleMeshes) {
+                    const randomColor = new BABYLON.Color3(Math.random(), Math.random(), Math.random());
+                    currentVehicleMeshes.forEach(mesh => {
+                        if (mesh.material && mesh.material.diffuseColor) {
+                            mesh.material.diffuseColor = randomColor;
+                        }
+                    });
+                }
+            };
+
+            const toggleWireframe = () => {
+                if (currentVehicleMeshes) {
+                    currentVehicleMeshes.forEach(mesh => {
+                        if (mesh.material) mesh.material.wireframe = !mesh.material.wireframe;
+                    });
+                }
+            };
+
+            const resetCamera = () => {
+                if (camera) {
+                    camera.alpha = -Math.PI / 2;
+                    camera.beta = Math.PI / 2.5;
+                    camera.radius = 15;
+                    camera.target.copyFromFloats(0, 1, 0);
+                }
+            };
+
+            const toggleGround = () => ground?.setEnabled(!ground.isEnabled());
+            const toggleLights = () => {
+                if (light && dirLight) {
+                    light.setEnabled(!light.isEnabled());
+                    dirLight.setEnabled(!dirLight.isEnabled());
+                }
+            };
+
+            const toggleAutoOrbit = () => {
+                if (camera.useAutoRotationBehavior) {
+                    camera.useAutoRotationBehavior = false;
+                    camera.removeBehavior(camera.autoRotationBehavior);
+                } else {
+                    const autoRotation = new BABYLON.AutoRotationBehavior();
+                    autoRotation.idleRotationSpeed = 0.2;
+                    camera.addBehavior(autoRotation);
+                    camera.useAutoRotationBehavior = true;
+                }
+            };
+            
+            // --- NEW Toolbox Functions ---
+            const takeScreenshot = () => BABYLON.Tools.CreateScreenshotUsingRenderTarget(engine, camera, { width: 1920, height: 1080 });
+            const toggleFog = () => scene.fogEnabled = !scene.fogEnabled;
+            const toggleSkybox = () => warSky?.skybox.setEnabled(!warSky.skybox.isEnabled());
+            const changeGroundTexture = () => {
+                if (ground && ground.material) {
+                    currentGroundTextureIndex = (currentGroundTextureIndex + 1) % groundTextureUrls.length;
+                    ground.material.diffuseTexture = new BABYLON.Texture(groundTextureUrls[currentGroundTextureIndex], scene);
+                }
+            };
+
             const updateUI = () => {
-                vehicleNameEl.textContent = `Vehicle ${currentVehicleIndex}`;
-                // Disable/Enable buttons at the start/end
+                vehicleNameEl.textContent = vehicleNames[currentVehicleIndex];
                 prevBtn.disabled = currentVehicleIndex === 1;
                 nextBtn.disabled = currentVehicleIndex === TOTAL_VEHICLES;
             };
 
-            // --- Event Listeners for buttons ---
+            // --- Event Listeners ---
             prevBtn.addEventListener('click', () => {
                 if (currentVehicleIndex > 1) {
                     currentVehicleIndex--;
-                    updateUI();
-                    loadVehicle(currentVehicleIndex);
+                    updateUI(); loadVehicle(currentVehicleIndex);
                 }
             });
 
             nextBtn.addEventListener('click', () => {
                 if (currentVehicleIndex < TOTAL_VEHICLES) {
                     currentVehicleIndex++;
-                    updateUI();
-                    loadVehicle(currentVehicleIndex);
+                    updateUI(); loadVehicle(currentVehicleIndex);
                 }
             });
 
-            // --- Initialize the scene and load the first vehicle ---
+            // Toolbox button listeners
+            colorBtn.addEventListener('click', changeVehicleColor);
+            wireframeBtn.addEventListener('click', toggleWireframe);
+            resetCameraBtn.addEventListener('click', resetCamera);
+            toggleGroundBtn.addEventListener('click', toggleGround);
+            toggleLightsBtn.addEventListener('click', toggleLights);
+            autoOrbitBtn.addEventListener('click', toggleAutoOrbit);
+            screenshotBtn.addEventListener('click', takeScreenshot);
+            toggleFogBtn.addEventListener('click', toggleFog);
+            toggleSkyboxBtn.addEventListener('click', toggleSkybox);
+            changeGroundBtn.addEventListener('click', changeGroundTexture);
+            
+            toggleToolboxBtn.addEventListener('click', () => toolbox.style.display = (toolbox.style.display === 'none' ? 'block' : 'none'));
+
+            const playRandomTune = () => {
+                enterOverlay.style.display = 'none';
+                const randomIndex = Math.floor(Math.random() * bgMusic.length);
+                bgMusic[randomIndex].play().catch(e => console.error("Music play failed:", e));
+            };
+            enterBtn.addEventListener('click', playRandomTune);
+
+            // --- Initialize Scene ---
             scene = createScene();
-            createSkybox(scene);
+            warSky = createWarPresetSkybox(scene, 'random'); // Store the skybox instance
             updateUI();
             loadVehicle(currentVehicleIndex);
 
             // --- Render loop ---
             engine.runRenderLoop(() => {
-                if (scene) {
-                    scene.render();
+                if (!scene) return;
+                scene.render();
+                if (currentVehicleMeshes && currentVehicleMeshes.length > 0) {
+                    const mainMesh = currentVehicleMeshes[0];
+                    const bb = mainMesh.getBoundingInfo().boundingBox;
+                    const worldCoord = bb.centerWorld.add(new BABYLON.Vector3(0, bb.extendSize.y, 0));
+                    const screenCoord = BABYLON.Vector3.Project(worldCoord, mainMesh.getWorldMatrix(), scene.getTransformMatrix(), camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight()));
+                    
+                    if (screenCoord.z > 0 && screenCoord.z < 1) {
+                        vehicleNameOverlay.style.display = 'block';
+                        vehicleNameOverlay.style.left = `${screenCoord.x}px`;
+                        vehicleNameOverlay.style.top = `${screenCoord.y}px`;
+                        vehicleNameOverlay.style.transform = 'translate(-50%, -200%)'; // Position above point
+                    } else {
+                        vehicleNameOverlay.style.display = 'none';
+                    }
+                } else {
+                    vehicleNameOverlay.style.display = 'none';
                 }
             });
 
-            // --- Handle window resize ---
-            window.addEventListener('resize', () => {
-                engine.resize();
-            });
+            window.addEventListener('resize', () => engine.resize());
         });
     </script>
-
 </body>
 </html>
